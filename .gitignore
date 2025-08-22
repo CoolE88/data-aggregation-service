@@ -1,0 +1,20 @@
+# Environment variables
+.env
+
+# Build artifacts
+data-aggregation-service
+
+# Test coverage
+coverage.out
+
+# Generated code
+gen/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

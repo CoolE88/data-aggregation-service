@@ -1,0 +1,31 @@
+### Health Check
+GET http://localhost:8080/health
+Accept: application/json
+
+### Get Metrics (Prometheus)
+GET http://localhost:8080/metrics
+Accept: application/json
+
+### Get Max Values by Time Range (Valid request)
+GET http://localhost:8080/api/v1/max-values?start=2025-08-31T10:59:00Z&end=2026-08-01T22:53:56Z
+Accept: application/json
+
+### Get Max Values by Time Range (Missing parameters)
+GET http://localhost:8080/api/v1/max-values
+Accept: application/json
+
+### Get Max Values by Time Range (Invalid date format)
+GET http://localhost:8080/api/v1/max-values?start=invalid-date&end=2024-01-02T00:00:00Z
+Accept: application/json
+
+### Get Max Value by Packet ID (Valid ID)
+GET http://localhost:8080/api/v1/max-values/123e4567-e89b-12d3-a456-426614174000
+Accept: application/json
+
+### Get Max Value by Packet ID (Non-existent ID)
+GET http://localhost:8080/api/v1/max-values/00000000-0000-0000-0000-000000000000
+Accept: application/json
+
+### Get Max Value by Packet ID (Invalid ID format)
+GET http://localhost:8080/api/v1/max-values/invalid-id
+Accept: application/json

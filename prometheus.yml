@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'data-aggregation-service'
+    static_configs:
+      - targets: ['app:8080']  # HTTP порт приложения, где доступны метрики
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9091']  # Prometheus сам себя собирает на внешнем порту 9091

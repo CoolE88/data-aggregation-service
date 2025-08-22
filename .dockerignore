@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# Файлы окружения с секретами
+.env
+
+# Артефакты сборки и сгенерированные файлы
+data-aggregation-service
+coverage.out
+gen/
+
+# Логи
+*.log
+
+# IDE и системные файлы
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker Compose файлы, если не нужны в образе
+docker-compose.yml
+docker-compose.override.yml
+
+# Системные файлы
+.DS_Store
+Thumbs.db

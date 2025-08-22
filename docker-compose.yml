@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  migrations:
+    image: golang:1.24.5-alpine
+    working_dir: /app
+    volumes:
+      - ./migrations:/app/migrations
+    environment:
+      - GO111MODULE=on
+    command: >
+      sh -c "
+      apk add --no-cache git &&
+      go install github.com/pressly/goose/v3/cmd/goose@latest &&
+      export PATH=$PATH:$(go env GOPATH)/bin &&
+      goose -dir /app/migrations postgres \"postgres://elena:testy@postgres:5432/data_aggregator?sslmode=disable\" up
+      "
+    depends_on:
+      - postgres
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"  # HTTP API + метрики
+      - "9090:9090"  # gRPC
+    environment:
+      DB_DRIVER: postgres
+      DB_SOURCE: postgres://elena:testy@postgres:5432/data_aggregator?sslmode=disable
+      GRPC_PORT: :9090
+      REST_PORT: :8080
+      WORKER_COUNT: 5
+      # DATA_INTERVAL: 100
+      DATA_INTERVAL: 300000  # 5 min for test
+      MAX_DB_CONNECTIONS: 10
+      MIN_DB_CONNECTIONS: 2
+      MAX_CONN_LIFETIME: 3600
+      MAX_CONN_IDLE_TIME: 1800
+      LOG_LEVEL: info
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_DB: ${PGDATABASE}
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER} -d ${PGDATABASE}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9091:9090"  # Внешний 9091 → внутренний 9090 (Prometheus)
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  grafana_data:

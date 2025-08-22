@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package aggregator.v1;
+
+option go_package = "gen/go/aggregator/v1";
+
+
+service DataAggregationService {
+    rpc GetMaxValuesByPeriod(TimePeriod) returns (MaxValuesResponse);
+    rpc GetMaxValueByID(PackageID) returns (MaxValueResponse);
+}
+
+message TimePeriod {
+    string start_time = 1; // Начало периода в формате RFC3339
+    string end_time = 2;   // Конец периода в формате RFC3339
+}
+
+message PackageID {
+    string id = 1; // Идентификатор пакета
+}
+
+message MaxValuesResponse {
+    repeated MaxValue max_values = 1; // Список максимальных значений
+}
+
+message MaxValue {
+    string id = 1;       // Идентификатор пакета
+    int32 max_value = 2; // Максимальное значение
+}
+
+message MaxValueResponse {
+    string id = 1;       // Идентификатор пакета
+    int32 max_value = 2; // Максимальное значение
+}
