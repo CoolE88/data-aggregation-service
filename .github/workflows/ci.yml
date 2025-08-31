@@ -27,16 +27,20 @@ jobs:
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
           echo "$HOME/go/bin" >> $GITHUB_PATH
 
+      - name: Check proto file exists
+        run: |
+          ls -la api/proto/aggregator/v1/aggregator.proto
+          head -10 api/proto/aggregator/v1/aggregator.proto  # Покажет начало файла
+
       - name: Generate protobuf code
         run: |
           mkdir -p gen/go
           protoc \
             --proto_path=api/proto \
-            --go_out=gen/go \
-            --go-grpc_out=gen/go \
+            --go_out=paths=source_relative:gen/go \
+            --go-grpc_out=paths=source_relative:gen/go \
             api/proto/aggregator/v1/aggregator.proto
-          ls -l gen/go/aggregator/v1
-
+          ls -la gen/go/aggregator/v1
 
       - name: Show go.mod
         run: cat go.mod
