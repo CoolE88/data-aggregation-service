@@ -34,9 +34,8 @@ jobs:
 
     - name: Generate protobuf code
       run: |
-        pwd  # Для отладки: показывает текущую директорию
-        ls -la  # Для отладки: показывает содержимое корня
-        mkdir -p gen/go  # Создаёт директорию gen/go/, если её нет
+        pwd  # Для отладки
+        mkdir -p gen/go  
         protoc \
           --proto_path=api/proto \
           --go_out=gen/go \
@@ -45,8 +44,9 @@ jobs:
 
     - name: Install golangci-lint
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $GOPATH/bin v1.64.2
-        echo "$GOPATH/bin" >> $GITHUB_PATH
+        mkdir -p $HOME/bin
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $HOME/bin v1.64.2
+        echo "$HOME/bin" >> $GITHUB_PATH
 
     - name: Run linter
       run: golangci-lint run ./...
