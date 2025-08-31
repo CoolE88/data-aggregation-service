@@ -34,6 +34,9 @@ jobs:
 
     - name: Generate protobuf code
       run: |
+        pwd  # Для отладки: показывает текущую директорию
+        ls -la  # Для отладки: показывает содержимое корня
+        mkdir -p gen/go  # Создаёт директорию gen/go/, если её нет
         protoc \
           --proto_path=api/proto \
           --go_out=gen/go \

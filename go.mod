@@ -1,4 +1,3 @@
-
 module github.com/CoolE88/data-aggregation-service
 
 go 1.24.5
