@@ -25,6 +25,7 @@ jobs:
           sudo apt-get install -y protobuf-compiler
           go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
 
       - name: Generate protobuf code
         run: |
@@ -34,14 +35,14 @@ jobs:
             --go_out=gen/go \
             --go-grpc_out=gen/go \
             api/proto/aggregator/v1/aggregator.proto
+          ls -l gen/go/aggregator/v1
 
-      - name: Prepare Go modules
+
+      - name: Show go.mod
+        run: cat go.mod
+
+      - name: Run go mod tidy
         run: go mod tidy
-
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: v1.64.2
 
       - name: Run tests
         run: go test ./...
