@@ -11,9 +11,9 @@ func NewUUID() uuid.UUID {
 	return uuid.New()
 }
 
-func IsValidUUID(s string) bool {
+func IsValidUUID(s string) error {
 	_, err := uuid.Parse(s)
-	return err == nil
+	return err
 }
 
 // GenerateRandomPayload генерит рандомные инты

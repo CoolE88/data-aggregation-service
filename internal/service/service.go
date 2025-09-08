@@ -39,7 +39,7 @@ func (s *DataService) ProcessPacket(ctx context.Context, packet *domain.DataPack
 	if err := ctx.Err(); err != nil {
 		s.logger.Warn("[DataService] Processing cancelled by context",
 			zap.String("packet_id", packet.ID.String()))
-		return err
+		return ctx.Err()
 	}
 
 	maxValue := s.FindMaxValue(packet.Payload)

@@ -21,18 +21,13 @@ func (m *MockService) ProcessPacket(ctx context.Context, packet *domain.DataPack
 	return args.Error(0)
 }
 
-func (m *MockService) FindMaxValue(payload []int) int {
-	args := m.Called(payload)
-	return args.Int(0)
-}
-
 func TestAggregator_Start(t *testing.T) {
 	mockService := new(MockService)
 	logger, _ := zap.NewDevelopment()
 	aggregator := NewAggregator(mockService, 2, logger)
 
 	packets := make(chan *domain.DataPacket, 3)
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	packet1 := &domain.DataPacket{
@@ -57,6 +52,40 @@ func TestAggregator_Start(t *testing.T) {
 
 	aggregator.Start(ctx, packets)
 
+	// Ждём, пока все пакеты обработаются
+	aggregator.Wait()
+
 	mockService.AssertExpectations(t)
 	mockService.AssertNumberOfCalls(t, "ProcessPacket", 2)
+}
+
+func TestAggregator_Stop(t *testing.T) {
+	mockService := new(MockService)
+	logger, _ := zap.NewDevelopment()
+	aggregator := NewAggregator(mockService, 1, logger)
+
+	packets := make(chan *domain.DataPacket, 1)
+	ctx := context.Background()
+
+	aggregator.Start(ctx, packets)
+
+	// Дать время воркеру стартовать
+	time.Sleep(10 * time.Millisecond)
+
+	// Останавливаем агрегатор
+	aggregator.Stop()
+
+	// Ждём, пока воркер завершится
+	done := make(chan struct{})
+	go func() {
+		aggregator.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Успешно завершился
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Worker did not stop after Stop()")
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -24,7 +25,10 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	// Создаём отменяемый контекст для всего приложения
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // Гарантирует отмену при выходе
+
 	cfg := config.LoadConfig()
 
 	logger, err := applogger.NewLogger(cfg.LogLevel)
@@ -46,9 +50,8 @@ func main() {
 		return
 	}
 	defer func() {
-		if err := repo.Close(); err != nil {
-			logger.Error("Failed to close database connection", zap.Error(err))
-		}
+		repo.Close()
+		logger.Info("Database connection closed")
 	}()
 
 	logger.Info("Database connection established")
@@ -85,23 +88,32 @@ func main() {
 
 	// Генерация пакетов
 	timeGenerator := utils.PartitionedTimeGenerator()
-
 	ticker := time.NewTicker(time.Duration(cfg.DataInterval) * time.Millisecond)
 	defer ticker.Stop()
 
 	logger.Info("Starting packet generation")
 
-	// Ожидание сигналов завершения
+	// Ожидание сигнала завершения
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	// Имитируем внешний источник с пакетами
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		var closed bool
 
 		for {
 			select {
 			case <-ticker.C:
+				if ctx.Err() != nil { // Проверка контекста перед генерацией
+					logger.Info("Context cancelled, stopping packet generation")
+					if !closed {
+						close(packets)
+						closed = true //nolint:ineffassign // to avoid double closing
+					}
+					return
+				}
 				packet := &domain.DataPacket{
 					ID:        utils.NewUUID(),
 					Timestamp: timeGenerator.Generate(),
@@ -114,13 +126,7 @@ func main() {
 				default:
 					logger.Warn("Packet channel full, dropping packet")
 				}
-			case <-quit:
-				logger.Info("Stopping packet generation")
-				if !closed {
-					close(packets)
-					closed = true //nolint:ineffassign // to avoid double closing
-				}
-				return
+
 			case <-ctx.Done():
 				logger.Info("Stopping packet generation due to context cancellation")
 				if !closed {
@@ -132,16 +138,24 @@ func main() {
 		}
 	}()
 
-	// Ожидание сигнала завершения
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	logger.Info("Shutting down servers...")
 
-	// Graceful shutdown
-	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
+	// Отменяем контекст для всех компонентов (остановит генерацию, мониторинг и агрегатор)
+	cancel()
 
 	// Останавливаем генерацию
 	ticker.Stop()
+
+	// Останавливаем агрегатор явно
+	aggregator.Stop()
+	aggregator.Wait() // Дождаться завершения воркеров
+	wg.Wait()         // Дождаться генератора
+
+	// Graceful shutdown
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
 
 	// Останавливаем HTTP сервер
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {

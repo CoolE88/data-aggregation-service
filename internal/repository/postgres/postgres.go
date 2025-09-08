@@ -45,7 +45,7 @@ func NewPostgresRepository(ctx context.Context, dbConfig config.DBConfig, logger
 	}
 
 	// Запуск горутины для мониторинга соединений
-	go monitorConnections(pool, logger)
+	go monitorConnections(ctx, pool, logger)
 
 	return &PostgresRepository{
 		pool:   pool,
@@ -53,25 +53,35 @@ func NewPostgresRepository(ctx context.Context, dbConfig config.DBConfig, logger
 	}, nil
 }
 
-// monitorConnections периодически обновляет метрики соединений
-func monitorConnections(pool *pgxpool.Pool, logger *zap.Logger) {
+// monitorConnections периодически обновляет метрики соединений и завершается при отмене ctx
+func monitorConnections(ctx context.Context, pool *pgxpool.Pool, logger *zap.Logger) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		stats := pool.Stat()
-		metrics.DBActiveConnections.Set(float64(stats.AcquiredConns()))
-		metrics.DBIdleConnections.Set(float64(stats.IdleConns()))
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Stopping monitorConnections goroutine due to context cancellation")
+			return
+		case <-ticker.C:
+			stats := pool.Stat()
+			metrics.DBActiveConnections.Set(float64(stats.AcquiredConns()))
+			metrics.DBIdleConnections.Set(float64(stats.IdleConns()))
 
-		logger.Debug("Database connection stats",
-			zap.Int("acquired", int(stats.AcquiredConns())),
-			zap.Int("idle", int(stats.IdleConns())),
-			zap.Int("max", int(stats.MaxConns())),
-		)
+			logger.Debug("Database connection stats",
+				zap.Int("acquired", int(stats.AcquiredConns())),
+				zap.Int("idle", int(stats.IdleConns())),
+				zap.Int("max", int(stats.MaxConns())),
+			)
+		}
 	}
 }
 
 func (r *PostgresRepository) SaveProcessedData(ctx context.Context, data *domain.ProcessedData) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	start := time.Now()
 	defer func() {
 		metrics.DBQueryDuration.WithLabelValues("save_processed_data").Observe(time.Since(start).Seconds())
@@ -170,9 +180,8 @@ func (r *PostgresRepository) HealthCheck(ctx context.Context) error {
 	return r.pool.Ping(ctx)
 }
 
-func (r *PostgresRepository) Close() error {
+func (r *PostgresRepository) Close() {
 	if r.pool != nil {
 		r.pool.Close()
 	}
-	return nil
 }
